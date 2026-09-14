@@ -22,7 +22,7 @@ export const TIMEZONES = [
 
 export type TimezoneId = (typeof TIMEZONES)[number]["id"];
 
-export const DEFAULT_TIMEZONE: TimezoneId = "Asia/Jakarta";
+export const DEFAULT_TIMEZONE: TimezoneId = "Asia/Bangkok";
 
 export const LS_TIMEZONE = "miniapp.timezone";
 
