@@ -34,3 +34,18 @@ npm run dev
   pengumuman `aria-live` untuk jumlah notifikasi belum dibaca.
 - **Tanpa peringatan hidrasi**: seluruh pembacaan `localStorage` ditunda sampai status
   `ready`, dan penulisan ke storage juga digerbangi status tersebut.
+
+## Zona waktu, reset, dan Wawasan AI
+
+- **Zona waktu** (Pengaturan): daftar kini mencakup `Asia/Bangkok` (UTC+7) dan zona
+  UTC+7 lain; default mengikuti zona perangkat bila valid. Semua perhitungan hari/bulan
+  memakai zona pilihan, bukan jam perangkat (`src/lib/timezone.ts`).
+- **Uji reset** (Pengaturan → Uji Reset): menjalankan rollover harian/bulanan memakai
+  zona aktif dan menampilkan tabel perbandingan arus kas dompet sebelum vs sesudah reset.
+  Logika rollover murni ada di `src/lib/reset.ts`; UI di `src/components/ResetTester.tsx`.
+- **Catat arus kas** (Ringkasan → Daftar Dompet): input tervalidasi (angka positif,
+  maksimum Rp 1.000.000.000) yang langsung memperbarui arus kas dompet dan pendapatan
+  bersih harian.
+- **Kartu Wawasan AI** kini menyegarkan otomatis (debounce 800 ms) setiap kali data
+  berubah — tidak lagi menunggu halaman dimuat ulang; permintaan lama dibatalkan agar
+  hasil yang tampil selalu yang terbaru.
