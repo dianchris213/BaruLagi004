@@ -7,7 +7,9 @@
  */
 
 export const TIMEZONES = [
+  { id: "Asia/Bangkok", label: "Bangkok (UTC+7)" },
   { id: "Asia/Jakarta", label: "WIB — Jakarta (UTC+7)" },
+  { id: "Asia/Ho_Chi_Minh", label: "Ho Chi Minh (UTC+7)" },
   { id: "Asia/Makassar", label: "WITA — Makassar (UTC+8)" },
   { id: "Asia/Jayapura", label: "WIT — Jayapura (UTC+9)" },
   { id: "Asia/Singapore", label: "Singapura (UTC+8)" },
