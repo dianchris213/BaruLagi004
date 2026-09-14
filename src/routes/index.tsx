@@ -33,6 +33,16 @@ import {
   timezoneLabel,
   type TimezoneId,
 } from "@/lib/timezone";
+import {
+  applyDailyReset,
+  applyMonthlyReset,
+  emptyFlows as baseEmptyFlows,
+  type DailyStore,
+  type Flow,
+  type FlowStore,
+} from "@/lib/reset";
+import { ResetTester } from "@/components/ResetTester";
+import { WalletFlowEntry } from "@/components/WalletFlowEntry";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -61,9 +71,6 @@ export const Route = createFileRoute("/")({
 type Bill = { id: string; name: string; amount: number; daysLeft: number; icon: LucideIcon };
 type WalletItem = { id: string; name: string; balance: number };
 type Profile = { name: string; email: string; password: string };
-type Flow = { in: number; out: number };
-type FlowStore = { month: string; data: Record<string, Flow> };
-type DailyStore = { day: string; in: number; out: number };
 type ProfileErrors = Partial<Record<keyof Profile, string>>;
 
 const BILLS: Bill[] = [
@@ -120,7 +127,7 @@ function loadProfile(): Profile {
 }
 
 function emptyFlows(): Record<string, Flow> {
-  return Object.fromEntries(WALLETS.map((w) => [w.id, { in: 0, out: 0 }]));
+  return baseEmptyFlows(WALLETS);
 }
 
 /** Wallet flows reset per calendar month of the chosen timezone. */
@@ -356,30 +363,69 @@ function Index() {
   const totalOut = Object.values(flows.data).reduce((s, f) => s + (f?.out ?? 0), 0);
   const periodKey = flows.month || monthKey(timezone);
 
+  /* Record a validated cash flow; also feeds today's driver net. */
+  const recordFlow = useCallback(
+    (walletId: string, kind: "in" | "out", amount: number) => {
+      setFlows((f) => {
+        const current = f.data[walletId] ?? { in: 0, out: 0 };
+        return {
+          month: f.month || monthKey(timezone),
+          data: { ...f.data, [walletId]: { ...current, [kind]: current[kind] + amount } },
+        };
+      });
+      setDaily((d) => ({
+        day: d.day || dayKey(timezone),
+        in: kind === "in" ? d.in + amount : d.in,
+        out: kind === "out" ? d.out + amount : d.out,
+      }));
+    },
+    [timezone],
+  );
+
   /* AI insight from locally stored data only. */
   const requestInsight = useServerFn(generateInsight);
-  const runInsight = async () => {
+  const insightRun = useRef(0);
+
+  const insightPayload = useMemo(
+    () => ({
+      period: periodKey,
+      wallets: WALLETS.map((w) => {
+        const f = flows.data[w.id] ?? { in: 0, out: 0 };
+        return { name: w.name, balance: w.balance, in: f.in, out: f.out };
+      }),
+      bills: BILLS.map((b) => ({ name: b.name, amount: b.amount, paid: !!paid[b.id] })),
+      driverNet,
+    }),
+    [periodKey, flows, paid, driverNet],
+  );
+
+  const runInsight = useCallback(async () => {
+    const run = ++insightRun.current;
     setInsightLoading(true);
     setInsightError("");
     try {
-      const res = await requestInsight({
-        data: {
-          period: periodKey,
-          wallets: WALLETS.map((w) => {
-            const f = flows.data[w.id] ?? { in: 0, out: 0 };
-            return { name: w.name, balance: w.balance, in: f.in, out: f.out };
-          }),
-          bills: BILLS.map((b) => ({ name: b.name, amount: b.amount, paid: !!paid[b.id] })),
-          driverNet,
-        },
-      });
+      const res = await requestInsight({ data: insightPayload });
+      if (insightRun.current !== run) return;
       setInsight(res.text);
     } catch {
+      if (insightRun.current !== run) return;
       setInsightError("Wawasan AI belum bisa dibuat. Coba lagi sebentar lagi.");
     } finally {
-      setInsightLoading(false);
+      if (insightRun.current === run) setInsightLoading(false);
     }
-  };
+  }, [requestInsight, insightPayload]);
+
+  /* Live refresh: every data change regenerates the card (debounced), so the
+     insight no longer waits for a page reload. */
+  const insightSignature = JSON.stringify(insightPayload);
+  useEffect(() => {
+    if (!ready) return;
+    const id = window.setTimeout(() => {
+      void runInsight();
+    }, 800);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, insightSignature]);
 
   const fieldClass = (bad: boolean) =>
     `mt-1 w-full rounded-xl border bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none ${
@@ -466,6 +512,7 @@ function Index() {
                     );
                   })}
                 </ul>
+                <WalletFlowEntry wallets={WALLETS} disabled={!ready} onRecord={recordFlow} />
               </section>
 
               <section aria-label="Tagihan Bulanan" className="rounded-2xl bg-white p-4 shadow-sm">
@@ -642,6 +689,16 @@ function Index() {
                 Hari aktif: {dayKey(timezone)} • Bulan aktif: {monthLabel(periodKey)}
               </p>
             </section>
+
+            <ResetTester
+              wallets={WALLETS}
+              flows={flows}
+              daily={daily}
+              timezone={timezone}
+              disabled={!ready}
+              onDailyReset={(day) => setDaily(applyDailyReset(day))}
+              onMonthlyReset={(month) => setFlows(applyMonthlyReset(month, WALLETS))}
+            />
 
             <form
               onSubmit={saveProfile}
