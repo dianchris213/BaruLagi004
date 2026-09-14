@@ -106,3 +106,17 @@ export function msUntilZonedMidnight(zone: TimezoneId, date = new Date()): numbe
   const remaining = 86_400_000 - elapsed;
   return Math.min(Math.max(remaining, 1_000), 3_600_000);
 }
+
+/** Day key of the calendar day after "today in `zone`". */
+export function nextDayKey(zone: TimezoneId, date = new Date()): string {
+  const { year, month, day } = zonedParts(zone, date);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
+}
+
+/** Month key of the calendar month after "this month in `zone`". */
+export function nextMonthKey(zone: TimezoneId, date = new Date()): string {
+  const { year, month } = zonedParts(zone, date);
+  const next = new Date(Date.UTC(year, month, 1));
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}`;
+}
